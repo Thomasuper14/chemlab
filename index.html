@@ -303,12 +303,35 @@ function isFormula(str){
 return /^[A-Z][a-z]?\d*(?:[A-Z][a-z]?\d*)*$/.test(str);
 }
 
-const displayName =
-p.Title ||
-(p.IUPACName && p.IUPACName.length < 40 ? p.IUPACName : null) ||
-term;
+const rawName = p.Title || p.IUPACName || term;
+
+// rileva se è formula
+function isFormula(str){
+return /^[A-Z][a-z]?\d*(?:[A-Z][a-z]?\d*)*$/.test(str);
+}
+
+// nome principale (chimico pulito)
+const chemicalName =
+p.IUPACName && p.IUPACName.length < 50
+? p.IUPACName
+: rawName;
+
+// nome “umano”
+const displayName = isFormula(term)
+? chemicalName
+: term;
 
 lastName = displayName;
+let secondaryName = "";
+
+// casi speciali semplici (senza AI, stabile)
+if(term.toLowerCase().includes("fe2o3") || chemicalName.toLowerCase().includes("iron") ){
+secondaryName = "Ematite (minerale)";
+}
+
+if(term.toLowerCase().includes("h2o")){
+secondaryName = "Acqua";
+}
 lastFormula = p.MolecularFormula;
 
 let img=`https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/${id}/PNG`;
@@ -316,8 +339,11 @@ let img=`https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/${id}/PNG`;
 out.innerHTML=`
 <div class='card'>
 <div class='big'>${sub(p.MolecularFormula)}</div>
-<div>${displayName}</div>
+<div>
+  <b>${displayName}</b>
 </div>
+
+${secondaryName ? `<div style="opacity:.7;font-size:.9rem">${secondaryName}</div>` : ""}
 
 <img src='${img}' width='260'>
 
@@ -349,7 +375,7 @@ out.innerHTML="<div class='loading'>AI in elaborazione...</div>";
 
 let res = await ai(lastName,lastFormula);
 
-out.innerHTML = `<b>ChemGPT AI</b><p>${res}</p>`;
+out.innerHTML = `<b>ChemLab AI</b><p>${res}</p>`;
 
 }
 
