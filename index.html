@@ -69,8 +69,6 @@ color:#06210f;
 box-shadow:0 0 18px rgba(32,227,122,.35);
 }
 
-.aiBtn:hover{background:#18c767;}
-
 .container{
 max-width:1000px;
 margin:2rem auto;
@@ -131,39 +129,28 @@ color:#00D4FF;
 font-weight:800;
 }
 
-/* Molecule loader */
-.molecule-loader{
-width:60px;
-height:60px;
-margin:0 auto 10px auto;
-position:relative;
-}
-
-.atom{
-position:absolute;
-width:10px;
-height:10px;
-border-radius:50%;
-background:#00D4FF;
-top:50%;
-left:50%;
-transform-origin:0 0;
-animation:orbit 1.2s linear infinite;
-}
-
-.atom:nth-child(1){animation-delay:0s;}
-.atom:nth-child(2){animation-delay:0.4s;}
-.atom:nth-child(3){animation-delay:0.8s;}
-
-@keyframes orbit{
-0%{transform:rotate(0deg) translateX(20px) rotate(0deg);}
-100%{transform:rotate(360deg) translateX(20px) rotate(-360deg);}
-}
-
 .error{
 color:#ff5c5c;
 text-align:center;
 margin-top:1rem;
+}
+
+/* loader */
+.molecule-loader{
+width:60px;height:60px;margin:0 auto 10px auto;position:relative;
+}
+.atom{
+position:absolute;width:10px;height:10px;border-radius:50%;
+background:#00D4FF;top:50%;left:50%;
+transform-origin:0 0;
+animation:orbit 1.2s linear infinite;
+}
+.atom:nth-child(2){animation-delay:.4s;}
+.atom:nth-child(3){animation-delay:.8s;}
+
+@keyframes orbit{
+0%{transform:rotate(0deg) translateX(20px) rotate(0deg);}
+100%{transform:rotate(360deg) translateX(20px) rotate(-360deg);}
 }
 </style>
 </head>
@@ -176,7 +163,7 @@ margin-top:1rem;
 </header>
 
 <div class="search">
-<input id="q" placeholder="H2SO4, glucosio, aspirina..." onkeydown="if(event.key==='Enter')search()">
+<input id="q" placeholder="H2SO4, Fe2O3, NH4+, glucosio..." onkeydown="if(event.key==='Enter')search()">
 <button onclick="search()">SCAN</button>
 </div>
 
@@ -191,6 +178,7 @@ function sub(s){
 return s?.replace(/(\d+)/g,d=>[...d].map(x=>"₀₁₂₃₄₅₆₇₈₉"[x]).join(''));
 }
 
+/* input base */
 const map={
 glucosio:"glucose",
 acqua:"water",
@@ -203,6 +191,7 @@ metano:"methane",
 aspirina:"aspirin"
 };
 
+/* CID */
 async function cid(name){
 let r=await fetch(`https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/${encodeURIComponent(name)}/cids/JSON`);
 if(!r.ok)return null;
@@ -210,9 +199,8 @@ let j=await r.json();
 return j?.IdentifierList?.CID?.[0]||null;
 }
 
+/* AI */
 async function ai(name, formula){
-
-try{
 
 const r = await fetch(
 "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=AIzaSyCTfq1Z1bw10I2xjJdebzkohTh_07leJQs",
@@ -253,19 +241,45 @@ Rispondi SOLO in italiano e SOLO nel formato:
 );
 
 const data = await r.json();
-
-if(data?.error){
-return "AI error: " + data.error.message;
-}
+if(data?.error) return "AI error: " + data.error.message;
 
 return data?.candidates?.[0]?.content?.parts?.[0]?.text || "No AI response";
-
-}catch(e){
-return "AI request failed";
 }
 
+/* NOME INTELLIGENTE */
+function getChemName(p, term){
+
+const title = p.Title;
+const iupac = p.IUPACName;
+
+function bad(n){
+return !n || n.length > 60 || n.includes("(");
 }
 
+const dictIT = {
+"water":"acqua",
+"glucose":"glucosio",
+"iron":"ferro",
+"iron(iii) oxide":"ossido di ferro(III)",
+"ammonium":"ione ammonio",
+"sulfuric acid":"acido solforico",
+"nitric acid":"acido nitrico",
+"hydrochloric acid":"acido cloridrico",
+"methane":"metano",
+"ethanol":"etanolo"
+};
+
+let base =
+!bad(title) ? title :
+!bad(iupac) ? iupac :
+term;
+
+let it = dictIT[base.toLowerCase()] || null;
+
+return {main: base, it};
+}
+
+/* SEARCH */
 async function search(){
 
 let q=document.getElementById("q").value.trim();
@@ -299,52 +313,22 @@ let r=await fetch(`https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/${id}/
 let j=await r.json();
 let p=j?.PropertyTable?.Properties?.[0];
 
+const nameObj = getChemName(p, term);
 
-const rawName = p.Title || p.IUPACName || term;
-
-// evita nomi ionici brutti tipo bis(iron...)
-function isBadIUPAC(name){
-return name && (
-name.includes("(") ||
-name.includes("ion") ||
-name.includes("iron(3+)") ||
-name.length > 60
-);
-}
-
-// nome chimico pulito
-const chemicalName =
-!isBadIUPAC(p.IUPACName)
-? p.IUPACName
-: (p.Title || term);
-
-// nome mostrato
-const displayName = chemicalName || term;
-
-// nome secondario manuale intelligente
-let secondaryName = "";
-
-const t = term.toLowerCase();
-
-if(t.includes("fe2o3")){
-secondaryName = "Ematite (ossido di ferro III)";
-}
-
-if(t === "h2o"){
-secondaryName = "Acqua";
-}
+lastName = nameObj.main;
 lastFormula = p.MolecularFormula;
+
+let secondary = nameObj.it;
 
 let img=`https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/${id}/PNG`;
 
 out.innerHTML=`
 <div class='card'>
 <div class='big'>${sub(p.MolecularFormula)}</div>
-<div>
-  <b>${displayName}</b>
-</div>
 
-${secondaryName ? `<div style="opacity:.7;font-size:.9rem">${secondaryName}</div>` : ""}
+<div><b>${nameObj.main}</b></div>
+
+${secondary ? `<div style="opacity:.75;font-size:.95rem">🇮🇹 ${secondary}</div>` : ""}
 
 <img src='${img}' width='260'>
 
@@ -365,19 +349,16 @@ Apri scheda
 
 <div id='aiOut' class='ai'></div>
 `;
-
 }
 
 async function askAI(){
 
 let out=document.getElementById("aiOut");
-
 out.innerHTML="<div class='loading'>AI in elaborazione...</div>";
 
 let res = await ai(lastName,lastFormula);
 
 out.innerHTML = `<b>ChemLab AI</b><p>${res}</p>`;
-
 }
 
 </script>
