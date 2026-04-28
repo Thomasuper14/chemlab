@@ -141,10 +141,24 @@ border-radius:12px;
 
 img{
 display:block;
-margin:2rem auto;
 background:white;
 padding:10px;
 border-radius:12px;
+}
+
+.flex{
+display:flex;
+gap:2rem;
+justify-content:center;
+align-items:center;
+flex-wrap:wrap;
+margin-top:1rem;
+}
+
+canvas{
+background:#0f1a2b;
+border-radius:12px;
+border:1px solid #1f3b57;
 }
 
 .loading{
@@ -160,7 +174,7 @@ text-align:center;
 margin-top:1rem;
 }
 
-/* LOADER FIXATO */
+/* loader */
 .molecule-loader{
 width:60px;
 height:60px;
@@ -243,7 +257,7 @@ headers:{"Content-Type":"application/json"},
 body: JSON.stringify({
 contents:[{
 parts:[{
-text:`Sei un assistente di chimica. Rispondi SOLO in italiano.
+text:`Rispondi in italiano.
 
 Nome: ${name}
 Formula: ${formula}`
@@ -257,6 +271,58 @@ const data = await r.json();
 return data?.candidates?.[0]?.content?.parts?.[0]?.text || "No AI response";
 }
 
+function drawMolecule(){
+
+const canvas=document.getElementById("mol");
+if(!canvas) return;
+
+const ctx=canvas.getContext("2d");
+
+let angle=0;
+
+function loop(){
+
+ctx.clearRect(0,0,260,260);
+
+const cx=130, cy=130;
+
+// nucleo
+ctx.beginPath();
+ctx.fillStyle="#fff";
+ctx.arc(cx,cy,6,0,Math.PI*2);
+ctx.fill();
+
+let atoms=[
+{r:40,c:"#00D4FF",s:0.02},
+{r:70,c:"#B026FF",s:0.015},
+{r:100,c:"#20e37a",s:0.01}
+];
+
+atoms.forEach((a,i)=>{
+let x=cx+Math.cos(angle*a.s+i)*a.r;
+let y=cy+Math.sin(angle*a.s+i)*a.r;
+
+ctx.beginPath();
+ctx.fillStyle=a.c;
+ctx.shadowBlur=10;
+ctx.shadowColor=a.c;
+ctx.arc(x,y,6,0,Math.PI*2);
+ctx.fill();
+
+ctx.beginPath();
+ctx.strokeStyle="rgba(255,255,255,0.15)";
+ctx.moveTo(cx,cy);
+ctx.lineTo(x,y);
+ctx.stroke();
+});
+
+angle+=0.05;
+requestAnimationFrame(loop);
+}
+
+loop();
+}
+
 async function search(){
 
 let q=document.getElementById("q").value.trim();
@@ -267,16 +333,7 @@ out.innerHTML="<div class='error'>Inserisci un composto</div>";
 return;
 }
 
-out.innerHTML=`
-<div class="loading">
-<div class="molecule-loader">
-<div class="atom"></div>
-<div class="atom"></div>
-<div class="atom"></div>
-</div>
-Analisi...
-</div>
-`;
+out.innerHTML="loading...";
 
 let term=map[q.toLowerCase()]||q;
 let id=await cid(term);
@@ -290,31 +347,36 @@ let r=await fetch(`https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/${id}/
 let j=await r.json();
 let p=j?.PropertyTable?.Properties?.[0];
 
-lastName = p.IUPACName || term;
-lastFormula = p.MolecularFormula;
+lastName=p.IUPACName||term;
+lastFormula=p.MolecularFormula;
 
 let img=`https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/${id}/PNG`;
 
 out.innerHTML=`
-<div class='card'>
-<div class='big'>${sub(p.MolecularFormula)}</div>
+<div class="card">
+<div class="big">${sub(p.MolecularFormula)}</div>
 <div><b>${lastName}</b></div>
 
-<img src='${img}' width='260'>
-
-<div class='grid'>
-<div class='box'><div class='label'>Massa</div><div class='value'>${p.MolecularWeight}</div></div>
-<div class='box'><div class='label'>Carica</div><div class='value'>${p.Charge}</div></div>
+<div class="flex">
+<img src="${img}" width="220">
+<canvas id="mol" width="260" height="260"></canvas>
 </div>
 
-<button class='aiBtn' onclick='askAI()'>Chiedi ad AI ✨</button>
-<div id='aiOut' class='card'></div>
+<div class="grid">
+<div class="box"><div class="label">Massa</div><div class="value">${p.MolecularWeight}</div></div>
+<div class="box"><div class="label">Carica</div><div class="value">${p.Charge}</div></div>
+</div>
+
+<button class="aiBtn" onclick="askAI()">Chiedi ad AI ✨</button>
+<div id="aiOut" class="card"></div>
 `;
+
+setTimeout(drawMolecule,200);
 }
 
 async function askAI(){
 let out=document.getElementById("aiOut");
-out.innerHTML="AI in elaborazione...";
+out.innerHTML="AI...";
 let res=await ai(lastName,lastFormula);
 out.innerHTML=res;
 }
