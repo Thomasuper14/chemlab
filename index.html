@@ -129,12 +129,12 @@ border:1px solid #1f3b57;
 <body>
 
 <header>
-<h1>ChemLab</h1>
-<p>di Pizzamiglio, Mabrouk, Gorodenco, Ramera, Parigi.</p>
+<h1>ChemLab 2C</h1>
+<p>di Pizzamiglio, Gorodenco, Maneouk, Ramera, Parigi</p>
 </header>
 
 <div class="search">
-<input id="q" placeholder="H2SO4, glucose, aspirin..." onkeydown="if(event.key==='Enter')search()">
+<input id="q" placeholder="H2SO4, glucosio, aspirina..." onkeydown="if(event.key==='Enter')search()">
 <button onclick="search()">SCAN</button>
 </div>
 
@@ -171,6 +171,7 @@ body: JSON.stringify({
 contents: [{parts: [{text:`Sei un assistente di chimica. Rispondi SOLO in italiano e SOLO nel formato:
 
 🧪 Nome: ${name}
+🇮🇹Nome in italiano
 🧬 Formula: ${formula}
 
 📌 Classificazione:
@@ -218,7 +219,7 @@ let id=await cid(term);
 
 if(!id){out.innerHTML="<div class='error'>Non trovato</div>";return;}
 
-let r=await fetch(`https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/${id}/property/MolecularFormula,MolecularWeight,IUPACName,InChIKey,Charge/JSON`);
+let r=await fetch(`https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/${id}/property/MolecularFormula,MolecularWeight,IUPACName,CanonicalSMILES,InChIKey,Charge/JSON`);
 let j=await r.json();
 let p=j?.PropertyTable?.Properties?.[0];
 
@@ -231,6 +232,7 @@ out.innerHTML=`
 <div class='card'>
 <div class='big'>${sub(p.MolecularFormula)}</div>
 <div>${p.IUPACName}</div>
+<div>CID ${id}</div>
 </div>
 
 <img src='${img}' width='260'>
@@ -238,8 +240,8 @@ out.innerHTML=`
 <div class='grid'>
 <div class='box'><div class='label'>Massa</div><div class='value'>${p.MolecularWeight}</div></div>
 <div class='box'><div class='label'>Carica</div><div class='value'>${p.Charge}</div></div>
+<div class='box'><div class='label'>SMILES</div><div class='value'>${p.CanonicalSMILES}</div></div>
 <div class='box'><div class='label'>InChIKey</div><div class='value'>${p.InChIKey}</div></div>
-<div class='box'><div class='label'>PubChem</div><div class='value'><a href="https://pubchem.ncbi.nlm.nih.gov/compound/${id}" target="_blank" style="color:#00D4FF;text-decoration:none;">Apri scheda</a></div></div>
 </div>
 
 <button class='aiBtn' onclick='askAI()'>Chiedi ad AI ✨</button>
@@ -257,7 +259,7 @@ out.innerHTML="<div class='loading'>AI in elaborazione...</div>";
 
 let res = await ai(lastName,lastFormula);
 
-out.innerHTML = `<b>ChemGPT AI</b><p>${res}</p>`;
+out.innerHTML = `<b>ChemLab AI</b><p>${res}</p>`;
 
 }
 
