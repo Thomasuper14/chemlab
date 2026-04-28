@@ -5,8 +5,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>ChemLab 2C</title>
 
-<script src="https://3Dmol.org/build/3Dmol-min.js"></script>
-
 <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;700;900&display=swap" rel="stylesheet">
 
 <style>
@@ -15,7 +13,6 @@ margin:0;
 font-family:'Nunito',sans-serif;
 background: radial-gradient(circle at 20% 20%, #0b1b33, #070B14 60%);
 color:#cfefff;
-overflow-x:hidden;
 }
 
 header{
@@ -96,38 +93,16 @@ border-radius:12px;
 .label{font-size:.7rem;color:#6aa6c9;}
 .value{font-weight:800;}
 
-img{
-display:block;
-margin:1rem auto;
-background:white;
-padding:10px;
-border-radius:12px;
-}
-
-/* 3D BOX */
-.viewer3d{
-width:100%;
-height:350px;
-margin-top:1rem;
-border-radius:12px;
-overflow:hidden;
-border:1px solid #1f3b57;
-}
-
 .loading{
 text-align:center;
 color:#00D4FF;
 font-weight:800;
 }
 
-.aiBtn{
+.error{
+color:#ff5c5c;
+text-align:center;
 margin-top:1rem;
-padding:.8rem 1.4rem;
-border-radius:999px;
-border:none;
-background:#20e37a;
-font-weight:900;
-cursor:pointer;
 }
 </style>
 </head>
@@ -136,11 +111,11 @@ cursor:pointer;
 
 <header>
 <h1>ChemLab 2C</h1>
-<p>3D Molecular Viewer</p>
+<p>Chimica intelligente</p>
 </header>
 
 <div class="search">
-<input id="q" placeholder="H2SO4, Fe2O3, glucosio..." onkeydown="if(event.key==='Enter')search()">
+<input id="q" placeholder="H2SO4, glucosio, Fe2O3..." onkeydown="if(event.key==='Enter')search()">
 <button onclick="search()">SCAN</button>
 </div>
 
@@ -148,16 +123,54 @@ cursor:pointer;
 
 <script>
 
-let lastCID = "";
 let lastName = "";
 let lastFormula = "";
 
-/* CID */
+/* ELEMENTI */
+const elements = {
+"H": { name:"Idrogeno", mass:1.008 },
+"C": { name:"Carbonio", mass:12.01 },
+"O": { name:"Ossigeno", mass:16.00 },
+"N": { name:"Azoto", mass:14.01 },
+"Fe": { name:"Ferro", mass:55.85 },
+"Na": { name:"Sodio", mass:22.99 },
+"Cl": { name:"Cloro", mass:35.45 },
+"Au": { name:"Oro", mass:196.97 }
+};
+
+/* MAP ITALIANO */
+const map = {
+glucosio:"glucose",
+acqua:"water",
+ferro:"iron",
+oro:"gold",
+rame:"copper",
+argento:"silver",
+etanolo:"ethanol",
+metano:"methane",
+aspirina:"aspirin"
+};
+
+/* CID ROBUSTO */
 async function cid(name){
-let r = await fetch(`https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/${encodeURIComponent(name)}/cids/JSON`);
-if(!r.ok) return null;
+
+let urls = [
+`https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/${encodeURIComponent(name)}/cids/JSON`,
+`https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/${encodeURIComponent(name.toLowerCase())}/cids/JSON`
+];
+
+for(let u of urls){
+try{
+let r = await fetch(u);
+if(r.ok){
 let j = await r.json();
-return j?.IdentifierList?.CID?.[0] || null;
+let id = j?.IdentifierList?.CID?.[0];
+if(id) return id;
+}
+}catch(e){}
+}
+
+return null;
 }
 
 /* SEARCH */
@@ -167,37 +180,49 @@ let q = document.getElementById("q").value.trim();
 let out = document.getElementById("out");
 
 if(!q){
-out.innerHTML = "Inserisci composto";
+out.innerHTML="<div class='error'>Inserisci un composto</div>";
 return;
 }
 
-out.innerHTML = `<div class="loading">Caricamento struttura...</div>`;
+out.innerHTML="<div class='loading'>Analisi...</div>";
 
-let id = await cid(q);
+let term = map[q.toLowerCase()] || q;
+
+/* ELEMENTI */
+if(elements[q]){
+let el = elements[q];
+out.innerHTML=`
+<div class="card">
+<div class="big">${q}</div>
+<div><b>${el.name}</b></div>
+<div class="grid">
+<div class="box"><div class="label">Massa atomica</div><div class="value">${el.mass}</div></div>
+</div>
+</div>`;
+return;
+}
+
+/* PUBCHEM */
+let id = await cid(term);
 
 if(!id){
-out.innerHTML = "Non trovato";
+out.innerHTML="<div class='error'>Non trovato</div>";
 return;
 }
-
-lastCID = id;
 
 let r = await fetch(`https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/${id}/property/MolecularFormula,MolecularWeight,IUPACName/JSON`);
 let j = await r.json();
-let p = j.PropertyTable.Properties[0];
+let p = j?.PropertyTable?.Properties?.[0];
 
-lastName = p.IUPACName;
+lastName = p.IUPACName || term;
 lastFormula = p.MolecularFormula;
 
 let img = `https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/${id}/PNG`;
 
-/* VIEWER 3D URL (SDF) */
-let sdfURL = `https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/${id}/SDF`;
+out.innerHTML=`
+<div class='card'>
 
-out.innerHTML = `
-<div class="card">
-
-<div class="big">${p.MolecularFormula}</div>
+<div class='big'>${p.MolecularFormula}</div>
 <div><b>${p.IUPACName}</b></div>
 
 <img src="${img}" width="220">
@@ -207,49 +232,9 @@ out.innerHTML = `
 <div class="box"><div class="label">CID</div><div class="value">${id}</div></div>
 </div>
 
-<div id="viewer" class="viewer3d"></div>
-
-<button class="aiBtn" onclick="askAI()">Chiedi AI</button>
-<div id="aiOut"></div>
-
 </div>
 `;
 
-/* 3D MOLECULE */
-setTimeout(() => {
-let element = document.getElementById("viewer");
-
-let viewer = $3Dmol.createViewer(element, {backgroundColor: "#0B1220"});
-
-fetch(sdfURL)
-.then(r => r.text())
-.then(data => {
-viewer.addModel(data, "sdf");
-viewer.setStyle({}, {stick:{}});
-viewer.zoomTo();
-viewer.render();
-});
-}, 200);
-
-}
-
-/* AI (facoltativo) */
-async function askAI(){
-
-let out = document.getElementById("aiOut");
-out.innerHTML = "AI...";
-
-let r = await fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=AIzaSyCTfq1Z1bw10I2xjJdebzkohTh_07leJQs",{
-method:"POST",
-headers:{"Content-Type":"application/json"},
-body:JSON.stringify({
-contents:[{parts:[{text:`Spiega in italiano: ${lastName} ${lastFormula}`}]}]
-})
-});
-
-let d = await r.json();
-
-out.innerHTML = d?.candidates?.[0]?.content?.parts?.[0]?.text || "errore";
 }
 
 </script>
